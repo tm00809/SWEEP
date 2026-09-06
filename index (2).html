@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>赛季阵容编辑器</title>
+  <link rel="stylesheet" href="https://sfile.chatglm.cn/workspace/file/a7/a700dc2452.css">
+</head>
+<body>
+  <!-- ===== Season View ===== -->
+  <div id="season-view" class="view active">
+    <header class="season-header">
+      <svg class="sweep-svg header-sweep" viewBox="0 0 560 150" preserveAspectRatio="none" aria-hidden="true">
+        <!-- 主笔刷：左下 → 右上横扫 -->
+        <path d="M4 118 C 96 104 178 92 262 70 C 344 48 436 22 556 6
+                 L 542 38 C 452 52 372 70 296 90 C 212 112 122 130 14 146 Z"
+              fill="#e8392e" opacity="0.92"/>
+        <!-- 细白色飞白 -->
+        <path d="M60 128 C 150 116 240 104 330 84 C 420 64 500 44 558 30"
+              fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+      </svg>
+      <div class="header-brand">
+        <div class="brand-en">Season Lineup Editor</div>
+        <h1 class="season-title"><span id="current-season-num"></span></h1>
+      </div>
+    </header>
+
+    <!-- 横向滚动赛季切换条 -->
+    <div class="season-switcher-wrap">
+      <button class="switcher-arrow" id="season-prev" title="上一个赛季">‹</button>
+      <div class="season-switcher" id="season-switcher"></div>
+      <button class="switcher-arrow" id="season-next" title="下一个赛季">›</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="operators">干员列表</button>
+      <button class="tab" data-tab="equipment">装备列表</button>
+      <button class="tab" data-tab="strategies" id="strategy-tab-btn" style="display:none">策略列表</button>
+      <span class="tabs-hint" id="tabs-hint">左键入队 · 右键查看</span>
+    </div>
+
+    <main class="main-content">
+      <div id="operators-panel" class="tab-panel active"></div>
+      <div id="equipment-panel" class="tab-panel"></div>
+      <div id="strategies-panel" class="tab-panel"></div>
+    </main>
+
+    <section class="team-editor-section">
+      <div class="section-header">
+        <h2>队伍编辑器</h2>
+        <span class="team-count" id="team-count">0 / 8</span>
+        <div class="team-mode-switch" title="九人队伍需要人事部档案">
+          <button class="team-mode-btn active" data-mode="8">标准 8 人</button>
+          <button class="team-mode-btn" data-mode="9">九人队伍</button>
+        </div>
+        <button class="plans-btn" id="auth-btn" title="登录云端档案，跨设备同步">☁ 云端登录</button>
+        <button class="plans-btn" id="plans-btn" title="保存与载入阵容方案">📁 档案柜</button>
+        <button class="generate-btn" id="generate-btn">生成队伍</button>
+      </div>
+      <p class="team-hint">点击干员添加到队伍 · 队伍满员时自动进入备战席 · 切换到装备标签拖拽装备到干员</p>
+      <div class="team-slots" id="team-slots"></div>
+    </section>
+
+    <section class="bench-section">
+      <div class="section-header">
+        <h2>备战席</h2>
+        <span class="team-count" id="bench-count">0 / 10</span>
+      </div>
+      <p class="team-hint">点击备战席干员调回队伍（不参与羁绊统计） · × 移出备战席</p>
+      <div class="bench-slots" id="bench-slots"></div>
+    </section>
+
+    <section class="synergy-section">
+      <div class="section-header">
+        <h2>羁绊</h2>
+        <span class="total-cost" id="team-total-cost" title="按星级折算：二星 = 费用×3">总费用 0</span>
+      </div>
+      <div class="synergy-list" id="synergy-list"></div>
+    </section>
+  </div>
+
+  <!-- ===== Modal Overlay ===== -->
+  <div class="modal-overlay hidden" id="modal-overlay"></div>
+
+  <!-- Confirm Modal -->
+  <div class="modal hidden" id="confirm-modal">
+    <div class="modal-content">
+      <h3 id="confirm-title">提示</h3>
+      <p id="confirm-message"></p>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" id="confirm-yes">确认生成</button>
+        <button class="btn btn-secondary" id="confirm-no">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Equipment Replace Modal -->
+  <div class="modal hidden" id="equip-modal">
+    <div class="modal-content">
+      <h3>装备槽已满</h3>
+      <p>选择要替换的装备：</p>
+      <div id="equip-existing"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" id="equip-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Operator Detail Modal（右键查看简介） -->
+  <div class="modal hidden" id="op-detail-modal">
+    <div class="modal-content modal-large">
+      <div id="op-detail-content"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" id="op-detail-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result Modal -->
+  <div class="modal hidden" id="result-modal">
+    <div class="modal-content modal-large">
+      <h3>队伍生成成功</h3>
+      <div id="result-content"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" id="result-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plans Modal -->
+  <div class="modal hidden" id="plan-modal">
+    <div class="modal-content modal-large">
+      <h3>📁 档案柜 · <span id="plan-modal-season"></span></h3>
+      <div class="plan-save-row">
+        <input type="text" id="plan-name-input" class="plan-name-input" placeholder="为当前阵容起个档案代号…" maxlength="20" />
+        <button class="btn btn-primary" id="plan-save-btn">存入档案</button>
+      </div>
+      <div id="plan-list" class="plan-list"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" id="plan-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase SDK（云端档案，配置 key 后启用） -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Auth Modal -->
+  <div class="modal hidden" id="auth-modal">
+    <div class="modal-content">
+      <h3>☁ 云端档案登录</h3>
+      <p class="auth-hint">用「代号 + 访问码」标识身份，同一代号在任何设备登录都能看到自己的档案。新代号会自动注册。</p>
+      <div class="plan-save-row">
+        <input type="text" id="auth-code-input" class="plan-name-input" placeholder="特工代号" maxlength="20" />
+        <input type="password" id="auth-pin-input" class="plan-name-input" placeholder="访问码" maxlength="20" />
+      </div>
+      <p id="auth-error" class="auth-error"></p>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" id="auth-login-btn">登录 / 注册</button>
+        <button class="btn btn-secondary" id="auth-logout-btn" style="display:none;">退出登录</button>
+        <button class="btn btn-secondary" id="auth-cancel-btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dummy Synergy Select Modal -->
+  <div class="modal hidden" id="dummy-modal">
+    <div class="modal-content modal-large">
+      <h3>伪造羁绊签名</h3>
+      <p class="auth-hint">为 <b id="dummy-name"></b> 伪造盟约：点击下方标签选择羁绊组合（可多选、可不选），伪造的羁绊同样参与人数统计。</p>
+      <div id="dummy-syn-list" class="dummy-syn-grid"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" id="dummy-confirm-btn">确认伪造</button>
+        <button class="btn btn-secondary" id="dummy-cancel-btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- V23 队伍面板显隐开关 -->
+  <button class="panel-toggle-btn" id="panel-toggle-btn" title="收起/展开队伍界面">▲ 收起队伍</button>
+
+  <script src="https://sfile.chatglm.cn/workspace/file/2a/2a488cce5b.js"></script>
+</body>
+</html>
